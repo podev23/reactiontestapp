@@ -5,16 +5,19 @@
 //  Created by Fabian Weighold on 27.12.24.
 //
 
+import CoreData
 import SwiftUI
 
 @main
-struct reactiontestApp: App {
+struct ReactionTestApp: App {
     let persistenceController = PersistenceController.shared
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            NavigationStack {
+                ContentView()
+            }
+            .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
 }
