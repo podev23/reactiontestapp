@@ -2,7 +2,7 @@
 //  reactiontestTests.swift
 //  reactiontestTests
 //
-//  Created by Fabian Weighold on 27.12.24.
+//  Created by Fabian on 27.12.24.
 //
 
 import Testing
