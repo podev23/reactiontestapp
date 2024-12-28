@@ -13,6 +13,12 @@ struct ContentView: View {
     @State private var playerName: String = ""
     @State private var showReadyAnimation = false
     @State private var pulseEffect = 1.0
+    @State private var isDuringAnimation = false
+    
+    // Statt showError + errorMessage als separatem Alert:
+    // => wir nutzen .confirmationDialog
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     var body: some View {
         VStack(spacing: 20) {
@@ -32,9 +38,7 @@ struct ContentView: View {
                 .background(Color.blue)
                 .foregroundColor(.white)
                 .cornerRadius(10)
-                .onAppear {
-                    showSaveScoreAlert = true
-                }
+
             } else {
                 Text("Runde: \(round) von 5")
                 Text("Punkte: \(score)")
@@ -94,6 +98,8 @@ struct ContentView: View {
             }
         }
         .padding()
+        
+        // 1) Score-Alert bleibt als .alert
         .alert(isPresented: $showSaveScoreAlert) {
             Alert(
                 title: Text("Score speichern"),
@@ -106,6 +112,21 @@ struct ContentView: View {
                 }
             )
         }
+        
+        // 2) Fehler-Dialog (z.B. "zu früh berührt!") als .confirmationDialog
+        .confirmationDialog("Fehler", isPresented: $showError, presenting: errorMessage) { message in
+            Button("OK") {
+                // Jetzt ist der Fehler-Dialog zu.
+                // Wenn das Spiel vorbei ist, zeig das Alert zum Speichern
+                if isGameOver {
+                    showSaveScoreAlert = true
+                }
+            }
+        } message: { message in
+            Text(message)
+        }
+
+        // 3) Sheet für die Namenseingabe
         .sheet(isPresented: $showNameInputSheet) {
             VStack {
                 Text("Spielername eingeben")
@@ -124,9 +145,17 @@ struct ContentView: View {
             }
             .padding()
         }
+        // 4) onTapGesture: Falls man zu früh tippt -> showError
         .onTapGesture {
-            if isWaiting {
+            if isDuringAnimation {
+                print("Berührung vor Aufforderung")
+                errorMessage = "zu früh berührt!"
+                showError = true
+                endRoundEarly()
+            } else if isWaiting {
                 endRound()
+            } else {
+                print("Berührung ignoriert.")
             }
         }
     }
@@ -136,12 +165,40 @@ struct ContentView: View {
         isWaiting = false
         reactionTime = 0.0
         showReadyAnimation = true
-
+        isDuringAnimation = true
+        
+        // Runde merken
+        let currentRound = round
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            // Nur ausführen, wenn die Runde unverändert ist (niemand zu früh gedrückt hat)
+            guard self.round == currentRound else {
+                return  // Wenn die Rundennummer sich geändert hat, abbrechen
+            }
+            
+            // Erst jetzt darf der Spieler wirklich klicken
             self.showReadyAnimation = false
+            self.isDuringAnimation = false
             self.isWaiting = true
             self.startTime = Date()
         }
+    }
+
+    func endRoundEarly() {
+        isDuringAnimation = false
+        isWaiting = false
+        showReadyAnimation = false
+        reactionTime = 0.0
+        
+        // Runde hochzählen
+        round += 1
+        
+        if round > 5 {
+            isGameOver = true
+            // NICHT showSaveScoreAlert = true
+        }
+        
+        print("Runde abgebrochen: zu früh berührt.")
     }
 
     func endRound() {
@@ -149,20 +206,16 @@ struct ContentView: View {
 
         isWaiting = false
         if let startTime = startTime {
-            reactionTime = Date().timeIntervalSince(startTime) * 1000 // Reaktionszeit in ms
-            // Punkte berechnen: Je kürzer die Reaktionszeit, desto mehr Punkte
+            reactionTime = Date().timeIntervalSince(startTime) * 1000
             let points = max(0, 100 - Int(reactionTime / 10))
             score += points
-            bestRoundScore = max(bestRoundScore, points) // Besten Rundenscore aktualisieren
+            bestRoundScore = max(bestRoundScore, points)
             round += 1
-
-            print("Runde beendet: Reaktionszeit: \(reactionTime) ms, Punkte: \(points)")
 
             if round > 5 {
                 isGameOver = true
+                showSaveScoreAlert = true
             }
-        } else {
-            print("Fehler: Startzeit ist nil.")
         }
     }
 
